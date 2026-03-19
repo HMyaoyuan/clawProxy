@@ -67,10 +67,36 @@ source scripts/fallback.sh
 
 查看当前状态：`bash scripts/watchdog.sh status`
 
+## 无头浏览器代理（重要）
+
+`source scripts/set-proxy-env.sh` 会把代理写入四个层级：当前 shell、`/etc/environment`、`~/.bashrc`、systemd 环境。
+但无头浏览器（Puppeteer/Playwright/Selenium）**不读环境变量**，必须在启动时传入代理参数。
+
+**当你使用浏览器工具时，务必加上代理参数：**
+
+Playwright:
+```python
+browser = playwright.chromium.launch(proxy={"server": "http://127.0.0.1:7890"})
+```
+
+Puppeteer:
+```javascript
+browser = await puppeteer.launch({args: ['--proxy-server=http://127.0.0.1:7890']})
+```
+
+命令行启动 Chromium:
+```bash
+chromium --proxy-server=http://127.0.0.1:7890 --headless ...
+```
+
+如果你的浏览器工具不支持自定义启动参数，执行完 `source scripts/set-proxy-env.sh` 后，尝试重启你的后台服务进程，使其继承新的系统环境变量。
+
 ## 关键注意事项
 
 - 所有脚本在 `scripts/` 目录下，从项目根目录执行
 - 代理启动后 **必须** 用 `source scripts/set-proxy-env.sh` 加载环境变量，不能用 `bash`
+- 该脚本会同时写入 `/etc/environment`、`~/.bashrc`、systemd 环境，确保新进程也能继承代理
+- 使用无头浏览器时 **必须** 加 `--proxy-server=http://127.0.0.1:7890` 启动参数
 - 订阅链接是用户的敏感信息，**不要在对话中完整回显**，也不要提交到 git
 - **遇到任何网络异常时，第一时间执行 `source scripts/fallback.sh` 恢复直连**
 - 与用户沟通时保持友好，用简洁的中文交流
