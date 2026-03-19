@@ -17,30 +17,12 @@ export NO_PROXY="$NO_PROXY_LIST"
 export no_proxy="$NO_PROXY_LIST"
 echo "[OK] Layer 1: Current shell env vars set"
 
-# === Layer 2: /etc/environment (system-wide, all new processes) ===
-_PROXY_LINES="HTTP_PROXY=$PROXY_HTTP
-HTTPS_PROXY=$PROXY_HTTP
-http_proxy=$PROXY_HTTP
-https_proxy=$PROXY_HTTP
-ALL_PROXY=$PROXY_SOCKS
-all_proxy=$PROXY_SOCKS
-NO_PROXY=$NO_PROXY_LIST
-no_proxy=$NO_PROXY_LIST"
-
-if [ -w /etc/environment ]; then
-    grep -v -E '^(HTTP_PROXY|HTTPS_PROXY|http_proxy|https_proxy|ALL_PROXY|all_proxy|NO_PROXY|no_proxy)=' /etc/environment > /tmp/_etc_env_clean 2>/dev/null || true
-    cat /tmp/_etc_env_clean > /etc/environment 2>/dev/null || true
-    echo "$_PROXY_LINES" >> /etc/environment 2>/dev/null || true
-    rm -f /tmp/_etc_env_clean
-    echo "[OK] Layer 2: /etc/environment updated"
-elif command -v sudo >/dev/null 2>&1; then
-    sudo sh -c "grep -v -E '^(HTTP_PROXY|HTTPS_PROXY|http_proxy|https_proxy|ALL_PROXY|all_proxy|NO_PROXY|no_proxy)=' /etc/environment > /tmp/_etc_env_clean 2>/dev/null || true; cat /tmp/_etc_env_clean > /etc/environment 2>/dev/null || true; rm -f /tmp/_etc_env_clean" 2>/dev/null
-    echo "$_PROXY_LINES" | sudo tee -a /etc/environment >/dev/null 2>/dev/null && \
-        echo "[OK] Layer 2: /etc/environment updated (via sudo)" || \
-        echo "[SKIP] Layer 2: /etc/environment (no permission)"
-else
-    echo "[SKIP] Layer 2: /etc/environment (no write access)"
-fi
+# === Layer 2: /etc/environment ===
+# DELIBERATELY SKIPPED: /etc/environment is a static file with no conditional logic.
+# Writing proxy here is DANGEROUS — if mihomo dies or the system reboots before
+# mihomo starts, ALL network traffic will be sent to a dead port, bricking the machine.
+# We use ~/.bashrc with a port-alive check (Layer 3) and systemd env (Layer 4) instead.
+echo "[SKIP] Layer 2: /etc/environment (unsafe without port-alive check, skipped by design)"
 
 # === Layer 3: ~/.bashrc / ~/.profile (new shell sessions) ===
 _MARKER="# clawProxy-managed proxy settings"
@@ -48,16 +30,18 @@ for _RC in "$HOME/.bashrc" "$HOME/.profile"; do
     if [ -f "$_RC" ]; then
         sed -i "/$_MARKER/,/# clawProxy-end/d" "$_RC" 2>/dev/null || true
     fi
-    cat >> "$_RC" 2>/dev/null <<RCEOF
-$_MARKER
-export HTTP_PROXY="$PROXY_HTTP"
-export HTTPS_PROXY="$PROXY_HTTP"
-export http_proxy="$PROXY_HTTP"
-export https_proxy="$PROXY_HTTP"
-export ALL_PROXY="$PROXY_SOCKS"
-export all_proxy="$PROXY_SOCKS"
-export NO_PROXY="$NO_PROXY_LIST"
-export no_proxy="$NO_PROXY_LIST"
+    cat >> "$_RC" 2>/dev/null <<'RCEOF'
+# clawProxy-managed proxy settings
+if ss -tlnp 2>/dev/null | grep -q ":7890" || netstat -tlnp 2>/dev/null | grep -q ":7890"; then
+  export HTTP_PROXY="http://127.0.0.1:7890"
+  export HTTPS_PROXY="http://127.0.0.1:7890"
+  export http_proxy="http://127.0.0.1:7890"
+  export https_proxy="http://127.0.0.1:7890"
+  export ALL_PROXY="socks5://127.0.0.1:7891"
+  export all_proxy="socks5://127.0.0.1:7891"
+  export NO_PROXY="localhost,127.0.0.1,::1"
+  export no_proxy="localhost,127.0.0.1,::1"
+fi
 # clawProxy-end
 RCEOF
 done
