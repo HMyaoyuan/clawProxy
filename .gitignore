@@ -4,3 +4,6 @@
 config/config.yaml
 config/proxy-providers/
 config/logs/
+.proxy-status
+.mihomo.pid
+.watchdog.pid

@@ -1,5 +1,17 @@
 # 故障排查指南
 
+## 紧急情况：与用户失联风险
+
+**如果你因为代理故障无法正常工作，第一时间执行：**
+
+```bash
+source scripts/fallback.sh
+```
+
+这会立即恢复直连。恢复后再排查问题。
+
+---
+
 ## 常见问题
 
 ### 问题 1：mihomo 安装失败
@@ -53,6 +65,7 @@ curl -x http://127.0.0.1:7890 https://www.gstatic.com/generate_204 -v
 **常见原因**：
 - 订阅链接中的节点失效 → 让用户更换订阅链接，重新执行第 2 步
 - 订阅不是 Clash 格式 → 让用户确认或使用订阅转换服务
+- 尝试切换节点：`bash scripts/select-node.sh list` 查看可用节点
 
 ### 问题 4：环境变量未生效
 
@@ -90,3 +103,22 @@ git config --global --unset https.proxy
 
 1. 检查日志：`tail -30 config/logs/mihomo.log`
 2. 如果订阅链接本身也需要代理才能访问，让用户手动在能正常访问的设备上下载订阅配置内容，然后直接粘贴到 `config/config.yaml` 中替换 `proxy-providers` 部分。
+
+### 问题 7：代理突然中断 / 守护进程已回退到直连
+
+**现象**：`bash scripts/watchdog.sh status` 显示 `fallback`。
+
+**说明**：守护进程检测到所有节点不可用，已自动回退到直连模式以保证你不与用户失联。
+
+**恢复步骤**：
+
+1. 告知用户节点出现问题，询问是否有新的订阅链接
+2. 如果有新链接，重新执行第 2 步（更新 `.env` 并重新 `bash scripts/configure.sh`）
+3. 手动尝试恢复：
+
+```bash
+bash scripts/watchdog.sh recover
+source scripts/set-proxy-env.sh
+```
+
+4. 验证：`bash scripts/verify.sh`

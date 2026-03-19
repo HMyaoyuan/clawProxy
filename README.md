@@ -16,9 +16,22 @@
 
 1. 自动安装代理客户端（无需联网下载，已内置）
 2. **主动问你要** 代理订阅链接
-3. **主动问你选** 全局代理还是智能分流
+3. **主动问你选** 全局代理（推荐）还是智能分流
 4. 启动代理后 **主动展示** 可用节点列表，**问你选哪个**
-5. 自动验证代理是否生效并告知结果
+5. 启动守护进程，**自动监控代理健康** 并在节点故障时自动切换
+6. 自动验证代理是否生效并告知结果
+
+### 为什么默认推荐全局代理？
+
+智能分流模式下，部分请求走代理、部分直连，出口 IP 会频繁切换，容易导致服务不稳定甚至会话中断。全局代理确保所有流量通过同一出口，连接更稳定。
+
+### 防失联保留方案
+
+代理环境下最大的风险是节点失效导致 AI 助手与用户失联。本项目内置了三层保护：
+
+1. **守护进程（watchdog）** — 后台每 30 秒检测代理健康，连续失败后自动切换到其他可用节点
+2. **自动回退** — 当所有节点都不可用时，守护进程自动切换到直连模式，确保通信不中断
+3. **紧急回退脚本** — AI 助手可随时执行 `source scripts/fallback.sh` 一键恢复直连
 
 ## 前提条件
 
@@ -45,6 +58,8 @@ clawProxy/
 │   ├── unset-proxy-env.sh    # 取消代理环境变量
 │   ├── switch-mode.sh        # 切换模式（rule/global/direct）
 │   ├── select-node.sh        # 查看/切换节点
+│   ├── watchdog.sh           # 守护进程（健康检查 + 自动切换节点）
+│   ├── fallback.sh           # 紧急回退（一键恢复直连）
 │   └── verify.sh             # 验证连接
 ├── bin/                      # 预编译的 mihomo 二进制（免下载）
 │   ├── mihomo-linux-amd64.gz
@@ -77,6 +92,10 @@ bash scripts/verify.sh                        # 验证
 bash scripts/select-node.sh list              # 查看节点
 bash scripts/select-node.sh select "节点名"   # 选节点
 bash scripts/switch-mode.sh global            # 切全局模式
+bash scripts/watchdog.sh start               # 启动守护进程（自动监控+切换节点）
+bash scripts/watchdog.sh status              # 查看代理状态
+source scripts/fallback.sh                   # 紧急恢复直连（防失联）
+bash scripts/watchdog.sh recover             # 从直连恢复代理
 ```
 
 ## 用户声明与免责
